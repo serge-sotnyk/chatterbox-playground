@@ -1,12 +1,16 @@
 [project]
 name = "chatterbox-playground"
 version = "0.1.0"
-description = "Add your description here"
+description = "CLI tool for text-to-speech synthesis using Chatterbox models"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
   "numpy<2.0",
   "chatterbox-tts",
+  "ml-dtypes<0.5.0",
+  "onnx<1.17.0",
+  "resemble-perth==1.0.1",
+  "setuptools",
 ]
 
 [tool.uv.sources]
