@@ -14,6 +14,17 @@ from typing import Optional
 import torch
 import torchaudio as ta
 
+# Monkey patch torch.load to handle CUDA unavailability
+_original_torch_load = torch.load
+
+def _patched_torch_load(*args, **kwargs):
+    """Patched torch.load that automatically adds map_location='cpu' when CUDA is unavailable."""
+    if not torch.cuda.is_available() and 'map_location' not in kwargs:
+        kwargs['map_location'] = torch.device('cpu')
+    return _original_torch_load(*args, **kwargs)
+
+torch.load = _patched_torch_load
+
 # Fix for perth watermarker import issue
 try:
     import perth
@@ -42,14 +53,12 @@ def read_text_from_file(file_path: str) -> str:
 def generate_speech(text: str, language: str, output_file: str, audio_prompt_path: Optional[str] = None):
     """Generate speech using appropriate model based on language."""
 
-    # Determine device (prefer CUDA if available, but fallback to CPU for problematic models)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"PyTorch CUDA available: {torch.cuda.is_available()}")
     print(f"Using device: {device}")
 
     try:
         if language == "en":
-            # Use English model
             print("Loading English TTS model...")
             model = ChatterboxTTS.from_pretrained(device=device)
             print("Generating speech...")
@@ -59,24 +68,15 @@ def generate_speech(text: str, language: str, output_file: str, audio_prompt_pat
             else:
                 wav = model.generate(text)
         else:
-            # Use multilingual model - force CPU mode due to CUDA compatibility issues
-            print("Loading Multilingual TTS model (using CPU mode due to compatibility)...")
-            print("Note: Multilingual model may have CUDA compatibility issues, forcing CPU mode...")
-
-            # Force CPU mode for multilingual model to avoid CUDA deserialization issues
-            model = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
-
-            print(f"Generating speech in language: {language}")
+            print(f"Loading Multilingual TTS model for language: {language}...")
+            model = ChatterboxMultilingualTTS.from_pretrained(device=device)
+            print("Generating speech...")
 
             if audio_prompt_path:
                 wav = model.generate(text, language_id=language, audio_prompt_path=audio_prompt_path)
             else:
                 wav = model.generate(text, language_id=language)
 
-        print(f"Generated audio tensor shape: {wav.shape if hasattr(wav, 'shape') else 'Unknown'}")
-        print(f"Model sample rate: {model.sr}")
-
-        # Save the generated audio
         print(f"Saving audio to: {output_file}")
         ta.save(output_file, wav, model.sr)
         print("Speech generation completed successfully!")
@@ -86,13 +86,6 @@ def generate_speech(text: str, language: str, output_file: str, audio_prompt_pat
         print(f"Error during speech generation: {e}")
         print("Full traceback:")
         traceback.print_exc()
-
-        # If multilingual model fails, provide helpful message
-        if language != "en":
-            print("\nNote: The multilingual model may have compatibility issues.")
-            print("This is a known issue with the chatterbox-tts package on some systems.")
-            print("Try using the English model instead by omitting the -l parameter or using -l en")
-
         sys.exit(1)
 
 
