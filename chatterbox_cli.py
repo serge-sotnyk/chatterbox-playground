@@ -132,7 +132,7 @@ Examples:
 
     # Audio prompt for voice cloning
     parser.add_argument(
-        "--audio-prompt",
+        "-p", "--audio-prompt",
         help="Path to audio file to use as voice prompt for different voice synthesis"
     )
 
